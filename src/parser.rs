@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
-use std::fs;
 use std::path::Path;
+use std::{fmt, fs};
 
 use full_moon::ast::punctuated::{Pair, Punctuated};
 use full_moon::ast::{self, Expression, Field, TableConstructor};
@@ -14,6 +14,29 @@ enum ModuleType {
     Directory,
     Lua,
     Json,
+}
+
+#[derive(Debug, Clone)]
+struct RequireError {
+    value: String,
+}
+
+impl RequireError {
+    pub fn new(value: String) -> Self {
+        Self { value }
+    }
+}
+
+impl fmt::Display for RequireError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RequireError: {}", self.value)
+    }
+}
+
+impl Error for RequireError {
+    fn description(&self) -> &str {
+        &self.value
+    }
 }
 
 fn get_module_path(src_dir: &str, file_name: &str) -> Result<(String, ModuleType), String> {
@@ -113,7 +136,7 @@ pub fn json_to_lua(json: &serde_json::Value) -> ast::Value {
             }),
             Vec::new(),
         )),
-        serde_json::Value::Null | _ => ast::Value::Symbol(TokenReference::new(
+        serde_json::Value::Null => ast::Value::Symbol(TokenReference::new(
             Vec::new(),
             Token::new(TokenType::Symbol {
                 symbol: Symbol::Nil,
@@ -131,6 +154,7 @@ pub struct RequireVisitor<'a> {
     // Keeping track of current state
     cur_file: String,         // as a relative path, from src_dir, without extension
     cur_imports: Vec<String>, // as a relative path, from cur_file, so like ./../hello/.., without extension
+    cur_errors: Vec<String>,
 
     // Final state
     imports_memo: HashMap<String, Vec<String>>, // as a relative path, from the src_dir, without extension
@@ -145,6 +169,7 @@ impl<'a> RequireVisitor<'a> {
 
             cur_file: src_dir.to_string(),
             cur_imports: Vec::new(),
+            cur_errors: Vec::new(),
 
             imports_memo: HashMap::new(),
             all_json: HashMap::new(),
@@ -152,7 +177,10 @@ impl<'a> RequireVisitor<'a> {
     }
 
     /// Removes a file from the cached, and rebuilds the project
-    pub fn mark_file_change(&mut self, file: &str) {}
+    pub fn mark_file_change(&mut self, file: &str) {
+        self.imports_memo.remove(file);
+        self.all_json.remove(file);
+    }
 
     /// Builds the project
     pub fn generate_bundle(&mut self) -> Result<String, Box<dyn Error>> {
@@ -185,6 +213,7 @@ impl<'a> RequireVisitor<'a> {
         // First, clear the temporary storages
         {
             self.cur_imports.clear();
+            self.cur_errors.clear();
         }
 
         let mut i = 0;
@@ -195,6 +224,7 @@ impl<'a> RequireVisitor<'a> {
 
             // Get the import's file
             let (module_path, module_type) = get_module_path(self.src_dir, &import)?;
+
             let module_content = fs::read_to_string(&module_path)?;
 
             // if it's json do something else
@@ -237,8 +267,19 @@ impl<'a> RequireVisitor<'a> {
 
             self.cur_file = import.clone();
             self.cur_imports.clear();
+            self.cur_errors.clear();
 
             self.visit_ast(&module_ast);
+
+            // If there's errors, then we can't continue
+            if !self.cur_errors.is_empty() {
+                let first_error = self.cur_errors.get(0).unwrap().clone().to_string();
+
+                return Err(Box::new(RequireError::new(format!(
+                    "'{}': {}",
+                    import, first_error
+                ))));
+            }
 
             // Parse all the relative imports
             let mut rel_imports: Vec<String> = Vec::new();
@@ -286,10 +327,15 @@ impl<'a> Visitor for RequireVisitor<'a> {
             arguments,
         })) = _node.suffixes().next().unwrap()
         {
-            let first_arg = arguments.iter().next().expect(&format!(
-                "An argument is required for '_require', in file {}",
-                self.cur_file
-            ));
+            let first_arg = match arguments.iter().next() {
+                Some(arg) => arg,
+                None => {
+                    self.cur_errors
+                        .push(String::from("An argument is required for '_require'"));
+
+                    return;
+                }
+            };
 
             // Extract the first arg from the quotes
             if let ast::Expression::Value {
