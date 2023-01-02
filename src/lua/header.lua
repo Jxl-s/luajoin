@@ -1,10 +1,8 @@
-local LUAJOIN = {}
-LUAJOIN.CACHE = {}
+local __LUAJOIN_CACHE = {}
+local __LUAJOIN_FILES = {}
+local __LUAJOIN_DIRECTORIES = {}
 
-LUAJOIN.FILES = {}
-LUAJOIN.DIRECTORIES = {}
-
-function LUAJOIN._split(str, sep)
+local function __LUAJOIN_split(str, sep)
 	if string.split then
 		return string.split(str, sep)
 	end
@@ -22,12 +20,12 @@ function LUAJOIN._split(str, sep)
 	return t
 end
 
-function LUAJOIN._parsePath(path, current)
+local function __LUAJOIN_parsePath(path, current)
 	if not current then current = "" end
 
 	-- Split the paths into parts
-	local pathParts = LUAJOIN._split(path, "/")
-	local curPathParts = LUAJOIN._split(path, "/")
+	local pathParts = __LUAJOIN_split(path, "/")
+	local curPathParts = __LUAJOIN_split(path, "/")
 
 	-- Determine if it's a relative path to find
 	local isRelative = false
@@ -72,19 +70,19 @@ function LUAJOIN._parsePath(path, current)
 	return path
 end
 
-function LUAJOIN._require(path, current)
-    path = LUAJOIN._parsePath(path, current)
+function __LUAJOIN_require(path, current)
+    path = __LUAJOIN_parsePath(path, current)
 
-    if LUAJOIN.CACHE[path] then
-        return LUAJOIN.CACHE[path]
+    if __LUAJOIN_CACHE[path] then
+        return __LUAJOIN_CACHE[path]
     end
 
-    local target = LUAJOIN.FILES[path]
+    local target = __LUAJOIN_FILES[path]
     assert(target, "Could not find the module " .. path)
 
-    LUAJOIN.CACHE[path] = target(function(p)
-        return LUAJOIN._require(p, path)
+    __LUAJOIN_CACHE[path] = target(function(p)
+        return __LUAJOIN_require(p, path)
     end)
 
-    return LUAJOIN.CACHE[path]
+    return __LUAJOIN_CACHE[path]
 end

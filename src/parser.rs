@@ -201,14 +201,14 @@ impl<'a> RequireVisitor<'a> {
                 }
             };
 
-            let import_header = format!("\nLUAJOIN.FILES[\"{}\"]=function(_require)\n", import);
+            let import_header = format!("\n__LUAJOIN_FILES[\"{}\"]=function(_require)\n", import);
             let import_footer = "\nend";
 
             bundle.push_str(&(import_header + &module_content + import_footer));
         }
 
         // Add the footer, which will require the entry file
-        bundle.push_str(&format!("\nLUAJOIN._require(\"{}\")", self.entry_file));
+        bundle.push_str(&format!("\n__LUAJOIN_FILES[\"{}\"](__LUAJOIN_require)\n", self.entry_file));
 
         Ok(bundle)
     }
