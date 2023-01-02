@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::fs::{self, File};
 
 const PROJECT_FILE_NAME: &str = "project.luajoin.json";
@@ -10,10 +11,7 @@ pub struct Config {
     pub out_dir: String,
 }
 
-pub fn create_config_file(src_dir: &str, out_dir: &str, entry: &str) {
-    // Create the file
-    let config_file = File::create(PROJECT_FILE_NAME).unwrap();
-
+pub fn create_config_file(src_dir: &str, out_dir: &str, entry: &str) -> Result<(), Box<dyn Error>> {
     // Create the JSON
     let config_file_content = Config {
         src_dir: src_dir.to_string(),
@@ -22,20 +20,24 @@ pub fn create_config_file(src_dir: &str, out_dir: &str, entry: &str) {
         entry_file: entry.to_string(),
     };
 
+    // Create the file
+    let config_file = File::create(PROJECT_FILE_NAME)?;
+
     // Write the JSON
-    serde_json::to_writer_pretty(config_file, &config_file_content)
-        .expect("Error writing config file");
+    serde_json::to_writer_pretty(config_file, &config_file_content)?;
 
-    // Write the source dir, out dir, and entry file
-    fs::create_dir(&config_file_content.src_dir).expect("Error creating source directory");
-    fs::create_dir(&config_file_content.out_dir).expect("Error creating output directory");
+    // Create the source and output directories
+    fs::create_dir(&config_file_content.src_dir)?;
+    fs::create_dir(&config_file_content.out_dir)?;
 
+    // Write the entry file
     let entry_path = format!(
         "{}/{}.lua",
         &config_file_content.src_dir, &config_file_content.entry_file
     );
 
-    fs::write(entry_path, "print(\"Hello, world!\")").expect("Error writing entry file");
+    fs::write(entry_path, "print(\"Hello, world!\")")?;
+    Ok(())
 }
 
 pub fn get_config() -> Option<Config> {

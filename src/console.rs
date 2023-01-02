@@ -7,15 +7,27 @@ pub fn clear() {
     std::io::stdout().flush().unwrap();
 }
 
+pub fn log_error(text: &str) {
+    let cur_time = chrono::Local::now().format("%H:%M:%S").to_string();
+
+    // Log to stderr, with red text
+    eprintln!(
+        "{} {} | {}",
+        cur_time.black(),
+        "LuaJoin".yellow(),
+        text.to_string().red()
+    );
+}
+
 pub fn log(text: &str) {
     // get the current time in hh:mm:ss, with chrono
     let cur_time = chrono::Local::now().format("%H:%M:%S").to_string();
-    println!("{} {} | {}", cur_time.black(), "LPack".yellow(), text);
+    println!("{} {} | {}", cur_time.black(), "LuaJoin".yellow(), text);
 }
 
 pub fn log_inline(text: &str) {
     // get the current time in hh:mm:ss, with chrono
     let cur_time = chrono::Local::now().format("%H:%M:%S").to_string();
-    print!("{} {} | {}", cur_time.black(), "LPack".yellow(), text);
+    print!("{} {} | {}", cur_time.black(), "LuaJoin".yellow(), text);
     std::io::stdout().flush().unwrap();
 }
