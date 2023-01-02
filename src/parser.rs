@@ -16,6 +16,7 @@ enum ModuleType {
     Json,
 }
 
+const HEADER: &str = include_str!("lua/header.lua");
 #[derive(Debug, Clone)]
 struct RequireError {
     value: String,
@@ -186,8 +187,9 @@ impl<'a> RequireVisitor<'a> {
     pub fn generate_bundle(&mut self) -> Result<String, Box<dyn Error>> {
         // Traverse the file tree to get the imports
         let imports = self.traverse()?;
-        let mut bundle = String::new();
+        let mut bundle = String::from(HEADER);
 
+        // Add every import
         for import in imports {
             let (module_path, module_type) = get_module_path(self.src_dir, &import)?;
 
@@ -199,11 +201,14 @@ impl<'a> RequireVisitor<'a> {
                 }
             };
 
-            let import_header = format!("\nFILES[\"{}\"]=function(_require)\n", import);
+            let import_header = format!("\nLUAJOIN.FILES[\"{}\"]=function(_require)\n", import);
             let import_footer = "\nend";
 
             bundle.push_str(&(import_header + &module_content + import_footer));
         }
+
+        // Add the footer, which will require the entry file
+        bundle.push_str(&format!("\nLUAJOIN._require(\"{}\")", self.entry_file));
 
         Ok(bundle)
     }
