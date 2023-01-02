@@ -47,7 +47,7 @@ local function __LUAJOIN_parsePath(path, current)
 				table.insert(newPath, v)
 			end
 
-			if DIRECTORIES[current] then
+			if __LUAJOIN_DIRECTORIES[current] then
 				table.insert(newPath, "init")
 			end
 		end

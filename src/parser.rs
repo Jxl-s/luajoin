@@ -215,7 +215,12 @@ impl<'a> RequireVisitor<'a> {
                 }
             };
 
-            let import_header = format!("\n__LUAJOIN_FILES[\"{}\"]=function(_require)\n", import);
+            if let ModuleType::Directory = module_type {
+                let dir_header = format!("\n__LUAJOIN_DIRECTORIES[\"{}\"]=true", import);
+                bundle.push_str(&dir_header)
+            }
+
+            let import_header = format!("\n__LUAJOIN_FILES[\"{}\"]=function(_require)", import);
             let import_footer = "\nend";
 
             bundle.push_str(&(import_header + &module_content + import_footer));
@@ -223,12 +228,12 @@ impl<'a> RequireVisitor<'a> {
 
         // Add the dev footer
         if dev_file_exists {
-            bundle.push_str("\n__LUAJOIN_FILES[\".dev\"](__LUAJOIN_require)\n");
+            bundle.push_str("\n__LUAJOIN_FILES[\".dev\"](__LUAJOIN_require)");
         }
 
         // Add the footer, which will require the entry file
         bundle.push_str(&format!(
-            "__LUAJOIN_FILES[\"{}\"](__LUAJOIN_require)\n",
+            "\n__LUAJOIN_FILES[\"{}\"](__LUAJOIN_require)\n",
             self.entry_file
         ));
 
