@@ -4,4 +4,6 @@
 
     It is ran before the entry file, which can be
     used to modify any global variables or functions.
+
+    If you do not need it, feel free to delete it.
 ]=]

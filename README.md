@@ -8,7 +8,8 @@ JSON files are also supported.
 
 # Installation
 
-TODO: Add installation instructions
+Download the binary from the releases page, and
+place it in your path.
 
 # Lua Usage
 
