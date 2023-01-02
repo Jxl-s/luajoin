@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::path::Path;
 use std::{fmt, fs};
@@ -245,6 +245,7 @@ impl<'a> RequireVisitor<'a> {
 
         let mut i = 0;
         let mut all_file_imports = vec![self.entry_file.to_string()];
+        let mut all_file_imports_set: HashSet<String> = HashSet::new();
 
         while i < all_file_imports.len() {
             let import = all_file_imports.get(i).unwrap();
@@ -278,10 +279,11 @@ impl<'a> RequireVisitor<'a> {
                 let import_memo = self.imports_memo.get(import).unwrap();
                 for import in import_memo {
                     // Only insert the one's that are not there yet
-                    if all_file_imports.contains(import) {
+                    if all_file_imports_set.contains(import) {
                         continue;
                     }
 
+                    all_file_imports_set.insert(import.clone());
                     all_file_imports.push(import.clone());
                 }
 
@@ -311,6 +313,8 @@ impl<'a> RequireVisitor<'a> {
 
             // Parse all the relative imports
             let mut rel_imports: Vec<String> = Vec::new();
+            let mut rel_imports_set: HashSet<String> = HashSet::new();
+
             for import in &self.cur_imports {
                 let path = match module_type {
                     ModuleType::Directory => {
@@ -320,11 +324,13 @@ impl<'a> RequireVisitor<'a> {
                     _ => panic!("Unknown module type"),
                 };
 
-                if !rel_imports.contains(&path) {
+                if !rel_imports_set.contains(&path) {
+                    rel_imports_set.insert(path.clone());
                     rel_imports.push(path.clone());
                 }
 
-                if !all_file_imports.contains(&path) {
+                if !all_file_imports_set.contains(&path) {
+                    all_file_imports_set.insert(path.clone());
                     all_file_imports.push(path.clone());
                 }
             }
