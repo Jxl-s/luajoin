@@ -252,8 +252,6 @@ impl<'a> RequireVisitor<'a> {
             // Get the import's file
             let (module_path, module_type) = get_module_path(self.src_dir, &import)?;
 
-            let module_content = fs::read_to_string(&module_path)?;
-
             // if it's json do something else
             if let ModuleType::Json = module_type {
                 // If it's already parsed, then we don't need to visit it again
@@ -261,6 +259,8 @@ impl<'a> RequireVisitor<'a> {
                     i += 1;
                     continue;
                 }
+
+                let module_content = fs::read_to_string(&module_path)?;
 
                 // Parse the json
                 let json = serde_json::from_str(&module_content)?;
@@ -290,6 +290,7 @@ impl<'a> RequireVisitor<'a> {
             }
 
             // If it's not visited, then visit it
+            let module_content = fs::read_to_string(&module_path)?;
             let module_ast = full_moon::parse(&module_content)?;
 
             self.cur_file = import.clone();
