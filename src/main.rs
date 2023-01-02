@@ -189,7 +189,7 @@ fn main() {
 
                     // Find the offset, then get the relative file
                     let file_offset = cur_dir.len() + config.src_dir.len() + 2;
-                    let relative_file = file_name[file_offset..].to_string();
+                    let relative_file = file_name[file_offset..].to_string().replace("\\", "/");
                     let without_ext: String;
 
                     // Find the file without the extension
