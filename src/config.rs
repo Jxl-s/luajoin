@@ -2,7 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::{self, File};
 
-const PROJECT_FILE_NAME: &str = "project.luajoin.json";
+// Constants
+const CONFIG_FILE_NAME: &str = "config.luajoin.json";
+
+// Files
+const DEV_FILE_CONTENT: &str = include_str!("lua/.dev.lua");
+const MAIN_FILE_CONTENT: &str = include_str!("lua/main.lua");
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
@@ -13,7 +18,7 @@ pub struct Config {
 
 pub fn create_config_file(src_dir: &str, out_dir: &str, entry: &str) -> Result<(), Box<dyn Error>> {
     // Create the JSON
-    let config_file_content = Config {
+    let config = Config {
         src_dir: src_dir.to_string(),
         out_dir: out_dir.to_string(),
 
@@ -21,27 +26,32 @@ pub fn create_config_file(src_dir: &str, out_dir: &str, entry: &str) -> Result<(
     };
 
     // Create the file
-    let config_file = File::create(PROJECT_FILE_NAME)?;
+    let config_file = File::create(CONFIG_FILE_NAME)?;
 
     // Write the JSON
-    serde_json::to_writer_pretty(config_file, &config_file_content)?;
+    serde_json::to_writer_pretty(config_file, &config)?;
 
     // Create the source and output directories
-    fs::create_dir(&config_file_content.src_dir)?;
-    fs::create_dir(&config_file_content.out_dir)?;
+    fs::create_dir(&config.src_dir)?;
+    fs::create_dir(&config.out_dir)?;
 
     // Write the entry file
     let entry_path = format!(
         "{}/{}.lua",
-        &config_file_content.src_dir, &config_file_content.entry_file
+        &config.src_dir, &config.entry_file
     );
 
-    fs::write(entry_path, "print(\"Hello, world!\")")?;
+    // Write the dev file
+    let dev_path = format!("{}/.dev.lua", &config.src_dir);
+
+    fs::write(entry_path, MAIN_FILE_CONTENT)?;
+    fs::write(dev_path, DEV_FILE_CONTENT)?;
+
     Ok(())
 }
 
 pub fn get_config() -> Option<Config> {
-    let file = match File::open(PROJECT_FILE_NAME) {
+    let file = match File::open(CONFIG_FILE_NAME) {
         Ok(res) => res,
         Err(_) => return None,
     };

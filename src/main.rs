@@ -30,10 +30,15 @@ struct Args {
 }
 
 fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
+    // If the output directory does not exist, create it
+    if !Path::new(&config.out_dir).exists() {
+        fs::create_dir(&config.out_dir).unwrap();
+    }
+
     let start_time = SystemTime::now();
 
     // Build the file project
-    let bundle_result = match parser.generate_bundle() {
+    let bundle_result = match parser.generate_bundle(true) {
         Ok(bundle) => bundle,
         Err(err) => {
             console::log_error(&format!("Problem generating bundle: {}", err));

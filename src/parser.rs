@@ -184,10 +184,24 @@ impl<'a> RequireVisitor<'a> {
     }
 
     /// Builds the project
-    pub fn generate_bundle(&mut self) -> Result<String, Box<dyn Error>> {
+    pub fn generate_bundle(&mut self, development: bool) -> Result<String, Box<dyn Error>> {
         // Traverse the file tree to get the imports
-        let imports = self.traverse()?;
+        let mut imports = self.traverse()?;
         let mut bundle = String::from(HEADER);
+
+        // If we are in development, add the development code
+        let mut dev_file_exists = false;
+        if development {
+            // Find if the development file exists
+            let dev_file_path = format!("{}/{}", self.src_dir, ".dev.lua");
+            if Path::new(&dev_file_path).exists() {
+                dev_file_exists = true;
+            }
+        }
+
+        if dev_file_exists {
+            imports.push(String::from(".dev"));
+        }
 
         // Add every import
         for import in imports {
@@ -207,8 +221,16 @@ impl<'a> RequireVisitor<'a> {
             bundle.push_str(&(import_header + &module_content + import_footer));
         }
 
+        // Add the dev footer
+        if dev_file_exists {
+            bundle.push_str("\n__LUAJOIN_FILES[\".dev\"](__LUAJOIN_require)\n");
+        }
+
         // Add the footer, which will require the entry file
-        bundle.push_str(&format!("\n__LUAJOIN_FILES[\"{}\"](__LUAJOIN_require)\n", self.entry_file));
+        bundle.push_str(&format!(
+            "__LUAJOIN_FILES[\"{}\"](__LUAJOIN_require)\n",
+            self.entry_file
+        ));
 
         Ok(bundle)
     }
