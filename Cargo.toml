@@ -13,3 +13,4 @@ serde = { version = "1.0.152", features = ["derive"]}
 notify = "5.0.0"
 chrono = "0.4.23"
 clap = { version = "4.0.32", features = ["derive"] }
+simple-websockets = "0.1.4"

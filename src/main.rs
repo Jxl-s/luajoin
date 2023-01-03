@@ -3,6 +3,8 @@ use colorize::AnsiColor;
 use config::Config;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use parser::RequireVisitor;
+use simple_websockets::{Event};
+use std::sync::{Arc, Mutex};
 use std::{
     collections::HashMap,
     env, fs, io,
@@ -217,10 +219,59 @@ fn main() {
                 }
             });
 
-            // Loop thread
+            let event_hub = simple_websockets::launch(1338).expect("failed to listen on port 1338");
+
+            let clients = Arc::new(Mutex::new(HashMap::new()));
+            let clients_clone = clients.clone();
+
+            // listen to cli, if the input is "e", then print the number of clients
+            std::thread::spawn(move || {
+                let mut running = true;
+
+                while running {
+                    let mut input = String::new();
+
+                    io::stdin()
+                        .read_line(&mut input)
+                        .expect("Failed to read line");
+
+                    let clients = clients.lock().unwrap();
+                    match input.trim().to_lowercase().as_str() {
+                        "e" => println!("executing for {} clients", clients.len()),
+                        "exit" => std::process::exit(0),
+                        _ => (),
+                    };
+                }
+            });
+
+            // Websocket server ...
             loop {
-                let mut input = String::new();
-                io::stdin().read_line(&mut input).unwrap();
+                match event_hub.poll_event() {
+                    Event::Connect(client_id, responder) => {
+                        println!("A client connected with id #{}", client_id);
+
+                        let mut clients_map = clients_clone.lock().unwrap();
+                        clients_map.insert(client_id, responder);
+                    }
+                    Event::Disconnect(client_id) => {
+                        println!("Client #{} disconnected.", client_id);
+
+                        let mut clients_map = clients_clone.lock().unwrap();
+                        clients_map.remove(&client_id);
+                    }
+                    Event::Message(client_id, message) => {
+                        println!(
+                            "Received a message from client #{}: {:?}",
+                            client_id, message
+                        );
+
+                        let clients_map = clients_clone.lock().unwrap();
+                        let responder = clients_map.get(&client_id).unwrap();
+
+                        // echo the message back:
+                        responder.send(message);
+                    }
+                }
             }
         }
         "build" => {}
