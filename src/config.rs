@@ -36,16 +36,16 @@ pub fn create_config_file(src_dir: &str, out_dir: &str, entry: &str) -> Result<(
     fs::create_dir(&config.out_dir)?;
 
     // Write the entry file
-    let entry_path = format!(
-        "{}/{}.lua",
-        &config.src_dir, &config.entry_file
-    );
+    let entry_path = format!("{}/{}.lua", &config.src_dir, &config.entry_file);
 
     // Write the dev file
     let dev_path = format!("{}/.dev.lua", &config.src_dir);
 
+    let gitignore_content = format!("/{}\n/{}/.dev.lua", &config.out_dir, &config.src_dir);
+
     fs::write(entry_path, MAIN_FILE_CONTENT)?;
     fs::write(dev_path, DEV_FILE_CONTENT)?;
+    fs::write(".gitignore", &gitignore_content)?;
 
     Ok(())
 }
