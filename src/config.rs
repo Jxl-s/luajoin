@@ -9,7 +9,7 @@ const CONFIG_FILE_NAME: &str = "config.luajoin.json";
 const DEV_FILE_CONTENT: &str = include_str!("lua/.dev.lua");
 const MAIN_FILE_CONTENT: &str = include_str!("lua/main.lua");
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     pub entry_file: String,
     pub src_dir: String,

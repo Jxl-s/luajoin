@@ -1,16 +1,58 @@
+use crate::config::Config;
+use crate::parser::RequireVisitor;
+use clap::Parser;
+use colorize::AnsiColor;
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use serde::{Deserialize, Serialize};
+use simple_websockets::{Event, Message, Responder};
+use std::process;
+use std::sync::{Arc, Mutex};
 use std::{
     collections::HashMap,
-    fs, io,
-    sync::{Arc, Mutex},
+    env, fs, io,
+    path::Path,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-use colorize::AnsiColor;
-use simple_websockets::{Event, Message, Responder};
+use crate::console;
 
-use crate::{config, console};
+fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
+    // If the output directory does not exist, create it
+    if !Path::new(&config.out_dir).exists() {
+        fs::create_dir(&config.out_dir).unwrap();
+    }
 
-pub fn run() {
-    std::thread::spawn(|| {
+    let start_time = SystemTime::now();
+
+    // Build the file project
+    let bundle_result = match parser.generate_bundle(true) {
+        Ok(bundle) => bundle,
+        Err(err) => {
+            console::log_error(&format!("Problem generating bundle: {}", err));
+            return;
+        }
+    };
+
+    // Write the bundle to the output file
+    match fs::write(&(config.out_dir.to_owned() + "/bundle.lua"), &bundle_result) {
+        Ok(_) => (),
+        Err(err) => {
+            console::log_error(&format!("Problem writing bundle: {}", err));
+            return;
+        }
+    };
+
+    console::log(
+        &format!(
+            "Successfully generated bundle in {}ms!",
+            start_time.elapsed().unwrap().as_millis()
+        )
+        .green(),
+    );
+}
+
+pub fn run_server(config: Config) {
+    std::thread::spawn(move || {
         std::thread::scope(|f| {
             let clients = Arc::new(Mutex::new(HashMap::<u64, Responder>::new()));
             let clients_clone = clients.clone();
@@ -67,8 +109,6 @@ pub fn run() {
 
             // Create a thread for the CLI
             f.spawn(move || {
-                let config = config::get_config().unwrap();
-
                 loop {
                     let mut input = String::new();
 
@@ -104,4 +144,87 @@ pub fn run() {
             });
         });
     });
+}
+
+pub fn run_bundler(config: Config) {
+    // Debouncing for files
+    let mut debounce: HashMap<String, SystemTime> = HashMap::new();
+    let debounce_time = 50; // in MS
+
+    // Create the parser
+    let mut require_visitor = RequireVisitor::new(&config.src_dir, &config.entry_file);
+    make_bundle(&mut require_visitor, &config);
+
+    // Create the bundler
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut watcher = RecommendedWatcher::new(tx, notify::Config::default()).unwrap();
+
+    watcher
+        .watch(Path::new(&config.src_dir), RecursiveMode::Recursive)
+        .unwrap();
+
+    for e in rx {
+        let e = e.unwrap();
+
+        // Modify(Data(Content)) is the file update event
+        // Create(File) is the file creation event
+        // Modify(Name(Any)) is the file rename event, and removal
+        let valid_event = match e.kind {
+            notify::EventKind::Modify(notify::event::ModifyKind::Data(_)) => true,
+            notify::EventKind::Create(_) => true,
+            notify::EventKind::Modify(notify::event::ModifyKind::Name(_)) => true,
+            _ => false,
+        };
+
+        if !valid_event {
+            continue;
+        }
+
+        let mut marked_file_count = 0;
+        for file in &e.paths {
+            // Find the last event
+            let file_name = file.to_str().unwrap().to_string();
+
+            // if it doesnt exist in the map, add an instance of unix 0
+            let last_file_event = debounce
+                .entry(file_name.clone())
+                .or_insert(SystemTime::from(UNIX_EPOCH));
+
+            if last_file_event.elapsed().unwrap().as_millis() < debounce_time as u128 {
+                continue;
+            }
+
+            debounce.insert(file_name.clone(), SystemTime::now());
+            marked_file_count += 1;
+
+            // Parse the file's relative path in the project
+            let cur_dir = env::current_dir().unwrap().to_str().unwrap().to_string();
+
+            // Find the offset, then get the relative file
+            let file_offset = cur_dir.len() + config.src_dir.len() + 2;
+            let relative_file = file_name[file_offset..].to_string().replace("\\", "/");
+            let without_ext: String;
+
+            // Find the file without the extension
+            if relative_file.ends_with(".json") {
+                // Json file: remove the .json
+                without_ext = relative_file[..relative_file.len() - 5].to_string();
+            } else if relative_file.ends_with("/init.lua") {
+                without_ext = relative_file[..relative_file.len() - 9].to_string();
+            } else if relative_file.ends_with(".lua") {
+                // Lua file: remove the .lua
+                without_ext = relative_file[..relative_file.len() - 4].to_string();
+            } else {
+                // Not a lua file, skip
+                continue;
+            }
+
+            // Mark the file as changed
+            require_visitor.mark_file_change(&without_ext);
+        }
+
+        if marked_file_count > 0 {
+            make_bundle(&mut require_visitor, &config);
+        }
+    }
 }
