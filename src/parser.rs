@@ -193,6 +193,8 @@ impl<'a> RequireVisitor<'a> {
         let mut bundle = String::from(HEADER);
         let mut source_map: Vec<usize> = Vec::new();
 
+        source_map.push(HEADER.split("\n").count());
+
         // If we are in development, add the development code
         let mut dev_file_exists = false;
         if development {
@@ -243,6 +245,9 @@ impl<'a> RequireVisitor<'a> {
             "\n__LUAJOIN_FILES[\"{}\"](__LUAJOIN_require)\n",
             self.entry_file
         ));
+
+        // prepend something
+        imports.insert(0, String::from("[BUNDLER]"));
 
         Ok((bundle, source_map, imports))
     }

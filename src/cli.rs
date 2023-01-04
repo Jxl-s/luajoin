@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::parser::RequireVisitor;
 use colorize::AnsiColor;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use simple_websockets::{Event, Message, Responder};
 use std::sync::{Arc, Mutex};
 use std::{
@@ -16,8 +16,15 @@ use crate::console;
 
 #[derive(Serialize, Deserialize)]
 struct SourceMaps {
-    files: Vec<String>,
-    sources: Vec<usize>,
+    pub files: Vec<String>,
+    pub sources: Vec<usize>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ErrorLog {
+    pub message_lines: Vec<usize>,
+    pub stack_trace_lines: Vec<usize>,
+    pub message_content: String,
 }
 
 fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
@@ -53,7 +60,10 @@ fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
     };
 
     let src_map_json = serde_json::to_string(&src_map).unwrap();
-    match fs::write(&(config.out_dir.to_owned() + "/bundle.lua.map"), &src_map_json) {
+    match fs::write(
+        &(config.out_dir.to_owned() + "/bundle.lua.map"),
+        &src_map_json,
+    ) {
         Ok(_) => (),
         Err(err) => {
             console::log_error(&format!("Problem writing source map: {}", err));
@@ -70,7 +80,26 @@ fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
     );
 }
 
+fn map_to_source(line: usize, config: &Config) -> Option<(String, usize)> {
+    let source_map = fs::read_to_string(&(config.out_dir.to_owned() + "/bundle.lua.map")).unwrap();
+    let source_map: SourceMaps = serde_json::from_str(&source_map).unwrap();
+
+    // Go through the line, find if the current one is larger
+    for (i, &cur_line) in source_map.sources.iter().enumerate() {
+        if cur_line > line {
+            let file = source_map.files.get(i).unwrap();
+            let real_line = cur_line - line - 1;
+
+            return Some((file.to_string(), real_line));
+        }
+    }
+
+    None
+}
+
 pub fn run_server(config: Config) {
+    let config_2 = config.clone();
+
     std::thread::spawn(move || {
         std::thread::scope(|f| {
             let clients = Arc::new(Mutex::new(HashMap::<u64, Responder>::new()));
@@ -117,6 +146,51 @@ pub fn run_server(config: Config) {
                                             client_name.clone().green(),
                                             client_id
                                         ));
+                                    }
+                                    "error" => {
+                                        let error_data: ErrorLog =
+                                            serde_json::from_str(&message_vec.get(1).unwrap())
+                                                .unwrap();
+
+                                        // Format the header
+                                        let mut header_lines: Vec<String> = Vec::new();
+
+                                        // Format the header, the error
+                                        for line in error_data.message_lines {
+                                            let (file, rel_line) = map_to_source(line, &config_2)
+                                                .unwrap_or_else(|| ("Unknown".to_string(), 0));
+
+                                            header_lines
+                                                .push(format!("{}:{}", file, rel_line).cyan());
+                                        }
+
+                                        let mut header_lines = header_lines.join(": ") + ": ";
+                                        if (header_lines.len() as i32) < 0 {
+                                            header_lines = "".to_string();
+                                        }
+
+                                        // Get the header format
+                                        let error_header =
+                                            header_lines + &error_data.message_content.red();
+
+                                        // Get the rest of the message
+                                        let mut display_lines: Vec<String> =
+                                            vec![error_header, "\tStack Begin".to_string()];
+
+                                        for line in error_data.stack_trace_lines {
+                                            let (file, rel_line) = map_to_source(line, &config_2)
+                                                .unwrap_or_else(|| ("Unknown".to_string(), 0));
+
+                                            display_lines.push(
+                                                format!("\tFile '{}:{}'", file, rel_line).cyan(),
+                                            );
+                                        }
+
+                                        display_lines.push("\tStack End".to_string());
+
+                                        // Join the display lines into a string
+                                        let display_lines = display_lines.join("\n");
+                                        console::log(&format!("Runtime Error:\n{}", display_lines));
                                     }
                                     // TODO: Error tracking and source mapping
                                     _ => (),
