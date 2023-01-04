@@ -220,7 +220,7 @@ impl<'a> RequireVisitor<'a> {
                 bundle.push_str(&dir_header)
             }
 
-            let import_header = format!("\n__LUAJOIN_FILES[\"{}\"]=function(_require)", import);
+            let import_header = format!("\n__LUAJOIN_FILES[\"{}\"]=function(_require)\n", import);
             let import_footer = "\nend";
 
             bundle.push_str(&(import_header + &module_content + import_footer));

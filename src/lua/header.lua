@@ -25,7 +25,7 @@ local function __LUAJOIN_parsePath(path, current)
 
 	-- Split the paths into parts
 	local pathParts = __LUAJOIN_split(path, "/")
-	local curPathParts = __LUAJOIN_split(path, "/")
+	local curPathParts = __LUAJOIN_split(current, "/")
 
 	-- Determine if it's a relative path to find
 	local isRelative = false
