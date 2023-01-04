@@ -184,10 +184,14 @@ impl<'a> RequireVisitor<'a> {
     }
 
     /// Builds the project
-    pub fn generate_bundle(&mut self, development: bool) -> Result<String, Box<dyn Error>> {
+    pub fn generate_bundle(
+        &mut self,
+        development: bool,
+    ) -> Result<(String, Vec<usize>, Vec<String>), Box<dyn Error>> {
         // Traverse the file tree to get the imports
         let mut imports = self.traverse()?;
         let mut bundle = String::from(HEADER);
+        let mut source_map: Vec<usize> = Vec::new();
 
         // If we are in development, add the development code
         let mut dev_file_exists = false;
@@ -204,13 +208,13 @@ impl<'a> RequireVisitor<'a> {
         }
 
         // Add every import
-        for import in imports {
+        for import in &imports {
             let (module_path, module_type) = get_module_path(self.src_dir, &import)?;
 
             let module_content = match module_type {
                 ModuleType::Lua | ModuleType::Directory => fs::read_to_string(&module_path)?,
                 ModuleType::Json => {
-                    let json_lua = self.all_json.get(&import).unwrap();
+                    let json_lua = self.all_json.get(import).unwrap();
                     json_lua.to_string()
                 }
             };
@@ -224,6 +228,9 @@ impl<'a> RequireVisitor<'a> {
             let import_footer = "\nend";
 
             bundle.push_str(&(import_header + &module_content + import_footer));
+
+            // Add the data to the source map
+            source_map.push(bundle.split('\n').count());
         }
 
         // Add the dev footer
@@ -237,7 +244,7 @@ impl<'a> RequireVisitor<'a> {
             self.entry_file
         ));
 
-        Ok(bundle)
+        Ok((bundle, source_map, imports))
     }
 
     /// Traverse the file tree, to return a list of all the files that are imported

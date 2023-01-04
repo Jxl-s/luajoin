@@ -1,11 +1,9 @@
 use crate::config::Config;
 use crate::parser::RequireVisitor;
-use clap::Parser;
 use colorize::AnsiColor;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 use simple_websockets::{Event, Message, Responder};
-use std::process;
 use std::sync::{Arc, Mutex};
 use std::{
     collections::HashMap,
@@ -16,6 +14,12 @@ use std::{
 
 use crate::console;
 
+#[derive(Serialize, Deserialize)]
+struct SourceMaps {
+    files: Vec<String>,
+    sources: Vec<usize>,
+}
+
 fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
     // If the output directory does not exist, create it
     if !Path::new(&config.out_dir).exists() {
@@ -25,7 +29,7 @@ fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
     let start_time = SystemTime::now();
 
     // Build the file project
-    let bundle_result = match parser.generate_bundle(true) {
+    let (bundle_result, source_maps, imports) = match parser.generate_bundle(true) {
         Ok(bundle) => bundle,
         Err(err) => {
             console::log_error(&format!("Problem generating bundle: {}", err));
@@ -38,6 +42,21 @@ fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
         Ok(_) => (),
         Err(err) => {
             console::log_error(&format!("Problem writing bundle: {}", err));
+            return;
+        }
+    };
+
+    // Write the source map too
+    let src_map = SourceMaps {
+        files: imports,
+        sources: source_maps,
+    };
+
+    let src_map_json = serde_json::to_string(&src_map).unwrap();
+    match fs::write(&(config.out_dir.to_owned() + "/bundle.lua.map"), &src_map_json) {
+        Ok(_) => (),
+        Err(err) => {
+            console::log_error(&format!("Problem writing source map: {}", err));
             return;
         }
     };
@@ -99,6 +118,7 @@ pub fn run_server(config: Config) {
                                             client_id
                                         ));
                                     }
+                                    // TODO: Error tracking and source mapping
                                     _ => (),
                                 };
                             }

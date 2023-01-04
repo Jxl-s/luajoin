@@ -1,18 +1,7 @@
 use clap::Parser;
 use colorize::AnsiColor;
-use config::Config;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use parser::RequireVisitor;
-use serde::{Deserialize, Serialize};
-use simple_websockets::{Event, Message, Responder};
+use std::io;
 use std::process;
-use std::sync::{Arc, Mutex};
-use std::{
-    collections::HashMap,
-    env, fs, io,
-    path::Path,
-    time::{SystemTime, UNIX_EPOCH},
-};
 
 mod cli;
 mod config;
@@ -22,7 +11,6 @@ mod path;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-
 struct Args {
     /// init, serve, or build
     #[arg(default_value = "build")]
@@ -32,8 +20,6 @@ struct Args {
     #[arg(long, default_value = "false")]
     minify: bool,
 }
-
-
 
 fn main() {
     let args = Args::parse();
