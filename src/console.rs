@@ -20,9 +20,15 @@ pub fn log_error(text: &str) {
 }
 
 pub fn log(text: &str) {
+    // clear the current line
+    print!("\x1B[2K\r");
+    std::io::stdout().flush().unwrap();
+
     // get the current time in hh:mm:ss, with chrono
     let cur_time = chrono::Local::now().format("%H:%M:%S").to_string();
     println!("{} {} | {}", cur_time.black(), "LuaJoin".yellow(), text);
+    print!("> ");
+    std::io::stdout().flush().unwrap();
 }
 
 pub fn log_inline(text: &str) {
