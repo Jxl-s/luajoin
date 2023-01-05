@@ -374,31 +374,36 @@ impl<'a> RequireVisitor<'a> {
     }
 }
 
+fn empty_token() -> Token {
+    Token::new(TokenType::Whitespace {
+        characters: "".into(),
+    })
+}
+
+fn empty_token_ref() -> TokenReference {
+    TokenReference::new(Vec::new(), empty_token(), Vec::new())
+}
+
 impl<'a> VisitorMut for RequireVisitor<'a> {
     // Remove every comment from the AST
     fn visit_multi_line_comment(&mut self, token: Token) -> Token {
         Token::new(TokenType::Whitespace {
-            characters: "\n".repeat(token.to_string().split("\n").count() - 1).into(),
+            characters: "\n"
+                .repeat(token.to_string().split("\n").count() - 1)
+                .into(),
         })
     }
 
     // Single line comments too
     fn visit_single_line_comment(&mut self, _: Token) -> Token {
-        Token::new(TokenType::Whitespace {
-            characters: "".into(),
-        })
+        empty_token()
     }
 
-    // remove every type argument
-    // fn visit_type_argument_end(&mut self, _: ast::types::TypeArgument) -> ast::types::TypeArgument {
-    //     ast::types::TypeArgument::new(ast::types::TypeInfo::Basic(TokenReference::new(
-    //         Vec::new(),
-    //         Token::new(TokenType::Whitespace {
-    //             characters: "".into(),
-    //         }),
-    //         Vec::new(),
-    //     )))
-    // }
+    // Remove the type specifiers
+    fn visit_type_specifier(&mut self, _: ast::types::TypeSpecifier) -> ast::types::TypeSpecifier {
+        ast::types::TypeSpecifier::new(ast::types::TypeInfo::Basic(empty_token_ref()))
+            .with_punctuation(empty_token_ref())
+    }
 
     fn visit_function_call_end(&mut self, node: ast::FunctionCall) -> ast::FunctionCall {
         // Make sure it's a '_require' call
