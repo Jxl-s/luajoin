@@ -378,15 +378,27 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
     // Remove every comment from the AST
     fn visit_multi_line_comment(&mut self, token: Token) -> Token {
         Token::new(TokenType::Whitespace {
-            characters: "".into(),
+            characters: "\n".repeat(token.to_string().split("\n").count() - 1).into(),
         })
     }
 
-    fn visit_single_line_comment(&mut self, token: Token) -> Token {
+    // Single line comments too
+    fn visit_single_line_comment(&mut self, _: Token) -> Token {
         Token::new(TokenType::Whitespace {
             characters: "".into(),
         })
     }
+
+    // remove every type argument
+    // fn visit_type_argument_end(&mut self, _: ast::types::TypeArgument) -> ast::types::TypeArgument {
+    //     ast::types::TypeArgument::new(ast::types::TypeInfo::Basic(TokenReference::new(
+    //         Vec::new(),
+    //         Token::new(TokenType::Whitespace {
+    //             characters: "".into(),
+    //         }),
+    //         Vec::new(),
+    //     )))
+    // }
 
     fn visit_function_call_end(&mut self, node: ast::FunctionCall) -> ast::FunctionCall {
         // Make sure it's a '_require' call
