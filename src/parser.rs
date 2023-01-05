@@ -4,6 +4,7 @@ use std::path::Path;
 use std::{fmt, fs};
 
 use full_moon::ast::punctuated::{Pair, Punctuated};
+use full_moon::ast::types::TypeDeclaration;
 use full_moon::ast::{self, Expression, Field, TableConstructor};
 use full_moon::tokenizer::{StringLiteralQuoteType, Symbol, Token, TokenReference, TokenType};
 use full_moon::visitors::{Visitor, VisitorMut};
@@ -395,13 +396,32 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
         empty_token(0)
     }
 
-    // Remove the type specifiers
+    // Remove the type specifiers (function foo(bar: string)), remove the : string
     fn visit_type_specifier(&mut self, _: ast::types::TypeSpecifier) -> ast::types::TypeSpecifier {
         ast::types::TypeSpecifier::new(ast::types::TypeInfo::Basic(empty_token_ref(0)))
             .with_punctuation(empty_token_ref(0))
     }
 
-    fn visit_function_call_end(&mut self, node: ast::FunctionCall) -> ast::FunctionCall {
+    // type assertions: a::string
+    fn visit_type_assertion(&mut self, _: ast::types::TypeAssertion) -> ast::types::TypeAssertion {
+        ast::types::TypeAssertion::new(ast::types::TypeInfo::Basic(empty_token_ref(1)))
+            .with_assertion_op(empty_token_ref(0))
+    }
+
+    // declarations (type a = string)
+    fn visit_type_declaration(
+        &mut self,
+        token: ast::types::TypeDeclaration,
+    ) -> ast::types::TypeDeclaration {
+        TypeDeclaration::new(
+            empty_token_ref(0),
+            ast::types::TypeInfo::Basic(empty_token_ref(0)),
+        )
+        .with_equal_token(empty_token_ref(0))
+        .with_type_token(empty_token_ref(token.to_string().split('\n').count() - 1))
+    }
+
+    fn visit_function_call(&mut self, node: ast::FunctionCall) -> ast::FunctionCall {
         // Make sure it's a '_require' call
         if let ast::Prefix::Name(name) = node.prefix() {
             if let TokenType::Identifier { identifier } = name.token_type() {
