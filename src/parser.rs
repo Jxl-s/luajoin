@@ -6,7 +6,7 @@ use std::{fmt, fs};
 use full_moon::ast::punctuated::{Pair, Punctuated};
 use full_moon::ast::{self, Expression, Field, TableConstructor};
 use full_moon::tokenizer::{StringLiteralQuoteType, Symbol, Token, TokenReference, TokenType};
-use full_moon::visitors::Visitor;
+use full_moon::visitors::{Visitor, VisitorMut};
 
 use crate::path::parse_path;
 
@@ -159,6 +159,7 @@ pub struct RequireVisitor<'a> {
 
     // Final state
     imports_memo: HashMap<String, Vec<String>>, // as a relative path, from the src_dir, without extension
+    transformed_memo: HashMap<String, String>, // as a relative path, from the src_dir, without extension. This is the transformed lua code
     all_json: HashMap<String, String>, // same as all_imports, but for filename to lua table of json
 }
 
@@ -173,6 +174,7 @@ impl<'a> RequireVisitor<'a> {
             cur_errors: Vec::new(),
 
             imports_memo: HashMap::new(),
+            transformed_memo: HashMap::new(),
             all_json: HashMap::new(),
         }
     }
@@ -180,6 +182,7 @@ impl<'a> RequireVisitor<'a> {
     /// Removes a file from the cached, and rebuilds the project
     pub fn mark_file_change(&mut self, file: &str) {
         self.imports_memo.remove(file);
+        self.transformed_memo.remove(file);
         self.all_json.remove(file);
     }
 
@@ -214,7 +217,12 @@ impl<'a> RequireVisitor<'a> {
             let (module_path, module_type) = get_module_path(self.src_dir, &import)?;
 
             let module_content = match module_type {
-                ModuleType::Lua | ModuleType::Directory => fs::read_to_string(&module_path)?,
+                ModuleType::Lua | ModuleType::Directory => {
+                    match self.transformed_memo.get(import) {
+                        Some(lua) => lua.to_string(),
+                        None => fs::read_to_string(module_path)?,
+                    }
+                }
                 ModuleType::Json => {
                     let json_lua = self.all_json.get(import).unwrap();
                     json_lua.to_string()
@@ -316,7 +324,7 @@ impl<'a> RequireVisitor<'a> {
             self.cur_imports.clear();
             self.cur_errors.clear();
 
-            self.visit_ast(&module_ast);
+            let new_ast = self.visit_ast(module_ast);
 
             // If there's errors, then we can't continue
             if !self.cur_errors.is_empty() {
@@ -352,6 +360,11 @@ impl<'a> RequireVisitor<'a> {
                 }
             }
 
+            // Transform the AST
+            let new_source = full_moon::print(&new_ast);
+
+            self.transformed_memo
+                .insert(self.cur_file.clone(), new_source);
             self.imports_memo.insert(self.cur_file.clone(), rel_imports);
 
             i += 1;
@@ -361,13 +374,26 @@ impl<'a> RequireVisitor<'a> {
     }
 }
 
-impl<'a> Visitor for RequireVisitor<'a> {
-    fn visit_function_call_end(&mut self, _node: &ast::FunctionCall) {
+impl<'a> VisitorMut for RequireVisitor<'a> {
+    // Remove every comment from the AST
+    fn visit_multi_line_comment(&mut self, token: Token) -> Token {
+        Token::new(TokenType::Whitespace {
+            characters: "".into(),
+        })
+    }
+
+    fn visit_single_line_comment(&mut self, token: Token) -> Token {
+        Token::new(TokenType::Whitespace {
+            characters: "".into(),
+        })
+    }
+
+    fn visit_function_call_end(&mut self, node: ast::FunctionCall) -> ast::FunctionCall {
         // Make sure it's a '_require' call
-        if let ast::Prefix::Name(name) = _node.prefix() {
+        if let ast::Prefix::Name(name) = node.prefix() {
             if let TokenType::Identifier { identifier } = name.token_type() {
                 if identifier.to_string() != "_require" {
-                    return;
+                    return node;
                 }
             }
         }
@@ -376,7 +402,7 @@ impl<'a> Visitor for RequireVisitor<'a> {
         if let ast::Suffix::Call(ast::Call::AnonymousCall(ast::FunctionArgs::Parentheses {
             parentheses: _,
             arguments,
-        })) = _node.suffixes().next().unwrap()
+        })) = node.suffixes().next().unwrap()
         {
             let first_arg = match arguments.iter().next() {
                 Some(arg) => arg,
@@ -384,7 +410,7 @@ impl<'a> Visitor for RequireVisitor<'a> {
                     self.cur_errors
                         .push(String::from("An argument is required for '_require'"));
 
-                    return;
+                    return node.clone();
                 }
             };
 
@@ -410,5 +436,7 @@ impl<'a> Visitor for RequireVisitor<'a> {
                 }
             }
         }
+
+        return node;
     }
 }
