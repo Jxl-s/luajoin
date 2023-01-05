@@ -650,6 +650,7 @@ dependencies = [
  "colorize",
  "full_moon",
  "notify",
+ "notify-debouncer-mini",
  "serde",
  "serde_json",
  "simple-websockets",
@@ -698,6 +699,15 @@ dependencies = [
  "mio",
  "walkdir",
  "winapi",
+]
+
+[[package]]
+name = "notify-debouncer-mini"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e23e9fa24f094b143c1eb61f90ac6457de87be6987bc70746e0179f7dbc9007b"
+dependencies = [
+ "notify",
 ]
 
 [[package]]
