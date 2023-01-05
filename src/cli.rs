@@ -47,7 +47,7 @@ fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
     };
 
     // Write the bundle to the output file
-    match fs::write(&(config.out_dir.to_owned() + "/bundle.lua"), &bundle_result) {
+    match fs::write(&(config.out_dir.to_owned() + "/bundle.dev.lua"), &bundle_result) {
         Ok(_) => (),
         Err(err) => {
             console::log_error(&format!("Problem writing bundle: {}", err));
@@ -63,7 +63,7 @@ fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
 
     let src_map_json = serde_json::to_string(&src_map).unwrap();
     match fs::write(
-        &(config.out_dir.to_owned() + "/bundle.lua.map"),
+        &(config.out_dir.to_owned() + "/bundle.dev.lua.map"),
         &src_map_json,
     ) {
         Ok(_) => (),
@@ -83,14 +83,14 @@ fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
 }
 
 fn map_to_source(line: usize, config: &Config) -> Option<(String, usize)> {
-    let source_map = fs::read_to_string(&(config.out_dir.to_owned() + "/bundle.lua.map")).unwrap();
+    let source_map = fs::read_to_string(&(config.out_dir.to_owned() + "/bundle.dev.lua.map")).unwrap();
     let source_map: SourceMaps = serde_json::from_str(&source_map).unwrap();
 
     // Go through the line, find if the current one is larger
     for (i, &cur_line) in source_map.sources.iter().enumerate() {
         if cur_line > line {
             let file = source_map.files.get(i).unwrap();
-            let real_line = cur_line - line - 1;
+            let real_line = cur_line - line + 1;
 
             return Some((file.to_string(), real_line));
         }
@@ -222,7 +222,7 @@ pub fn run_server(config: Config) {
 
                             // Read the bundle
                             let bundle =
-                                fs::read_to_string(config.out_dir.to_owned() + "/bundle.lua")
+                                fs::read_to_string(config.out_dir.to_owned() + "/bundle.dev.lua")
                                     .unwrap();
 
                             let send_message =
