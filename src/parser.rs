@@ -498,10 +498,10 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
 
                                 match part_str.as_str() {
                                     "script" => {
-                                        rel_import_path.push(String::from("."));
+                                        // Do nothing
                                     }
                                     "Parent" => {
-                                        rel_import_path.push(String::from(".."));
+                                        rel_import_path.push(String::from("."));
                                     }
                                     _ => {
                                         rel_import_path.push(part_str);
@@ -510,13 +510,9 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
                             }
                         }
 
-                        // Make sure that the current require has the first part as 'script'
-                        if rel_import_path[0] != "." {
-                            return node.clone();
-                        }
-
                         // Get the new path
                         let required_path = rel_import_path.join("/");
+                        println!("{}", required_path);
                         self.cur_imports.push(required_path.clone());
 
                         // Create the tree nodes
