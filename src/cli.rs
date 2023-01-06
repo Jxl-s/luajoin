@@ -1,6 +1,8 @@
+use crate::build::BuildVisitor;
 use crate::config::Config;
 use crate::parser::RequireVisitor;
 use colorize::AnsiColor;
+use full_moon::visitors::VisitorMut;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use notify_debouncer_mini::new_debouncer;
 use serde::{Deserialize, Serialize};
@@ -47,7 +49,10 @@ fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
     };
 
     // Write the bundle to the output file
-    match fs::write(&(config.out_dir.to_owned() + "/bundle.dev.lua"), &bundle_result) {
+    match fs::write(
+        &(config.out_dir.to_owned() + "/bundle.dev.lua"),
+        &bundle_result,
+    ) {
         Ok(_) => (),
         Err(err) => {
             console::log_error(&format!("Problem writing bundle: {}", err));
@@ -83,7 +88,8 @@ fn make_bundle(parser: &mut RequireVisitor, config: &Config) {
 }
 
 fn map_to_source(line: usize, config: &Config) -> Option<(String, usize)> {
-    let source_map = fs::read_to_string(&(config.out_dir.to_owned() + "/bundle.dev.lua.map")).unwrap();
+    let source_map =
+        fs::read_to_string(&(config.out_dir.to_owned() + "/bundle.dev.lua.map")).unwrap();
     let source_map: SourceMaps = serde_json::from_str(&source_map).unwrap();
 
     // Go through the line, find if the current one is larger
@@ -296,9 +302,33 @@ pub fn run_bundler(config: Config) {
                 console::log(&format!("File '{}' changed!", without_ext))
             }
         }
-        
+
         if marked_file_count > 0 {
             make_bundle(&mut require_visitor, &config);
         }
     }
+}
+
+pub fn build_project(config: Config) {
+    let mut require_visitor = RequireVisitor::new(&config.src_dir, &config.entry_file);
+
+    let (bundle_result, source_maps, imports) = match require_visitor.generate_bundle(true) {
+        Ok(bundle) => bundle,
+        Err(err) => {
+            console::log_error(&format!("Problem generating bundle: {}", err));
+            return;
+        }
+    };
+
+    // Create an AST from the bundled result
+    let ast = full_moon::parse(&bundle_result).unwrap();
+    let built_ast = BuildVisitor {}.visit_ast(ast);
+    let built_result = full_moon::print(&built_ast);
+
+    // Write to the file
+    fs::write(
+        &(config.out_dir.to_owned() + "/bundle.build.lua"),
+        &built_result,
+    )
+    .unwrap();
 }

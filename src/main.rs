@@ -8,6 +8,7 @@ mod config;
 mod console;
 mod parser;
 mod path;
+mod build;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -95,7 +96,16 @@ fn main() {
             // Run the bundler
             cli::run_bundler(config.clone());
         }
-        "build" => {}
+        "build" => {
+            console::clear();
+
+            let config = config::get_config().unwrap_or_else(|| {
+                console::log_error("Project file not found");
+                process::exit(1);
+            });
+
+            cli::build_project(config);
+        }
         _ => console::log_error(&"Invalid action".red()),
     };
 }
