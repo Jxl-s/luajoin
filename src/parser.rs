@@ -4,8 +4,11 @@ use std::path::Path;
 use std::{fmt, fs};
 
 use full_moon::ast::punctuated::{Pair, Punctuated};
-use full_moon::ast::types::TypeDeclaration;
-use full_moon::ast::{self, Expression, Field, TableConstructor};
+use full_moon::ast::span::ContainedSpan;
+use full_moon::ast::types::{IfExpression, TypeDeclaration};
+use full_moon::ast::{self, Expression, Field, Suffix, TableConstructor, Var, VarExpression};
+use full_moon::node::Node;
+use full_moon::print;
 use full_moon::tokenizer::{StringLiteralQuoteType, Symbol, Token, TokenReference, TokenType};
 use full_moon::visitors::{Visitor, VisitorMut};
 
@@ -425,7 +428,7 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
         // Make sure it's a '_require' call
         if let ast::Prefix::Name(name) = node.prefix() {
             if let TokenType::Identifier { identifier } = name.token_type() {
-                if identifier.to_string() != "_require" {
+                if identifier.to_string() != "_require" && identifier.to_string() != "require" {
                     return node;
                 }
             }
@@ -453,20 +456,100 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
                 type_assertion: _,
             } = first_arg
             {
-                if let ast::Value::String(s) = *value.clone() {
-                    if let TokenType::StringLiteral {
-                        literal,
-                        multi_line: _,
-                        quote_type: _,
-                    } = s.token_type()
-                    {
-                        // Get the string literal
-                        let required_path = literal.to_string();
+                match *value.clone() {
+                    ast::Value::String(s) => {
+                        if let TokenType::StringLiteral {
+                            literal,
+                            multi_line: _,
+                            quote_type: _,
+                        } = s.token_type()
+                        {
+                            // Get the string literal
+                            let required_path = literal.to_string();
 
-                        // Add it to the imports
-                        self.cur_imports.push(required_path.clone());
+                            // Add it to the imports
+                            self.cur_imports.push(required_path.clone());
+                        }
                     }
-                }
+                    ast::Value::Var(Var::Expression(ve)) => {
+                        let parts = ve.tokens().into_iter();
+
+                        // Will store the state for the relative import, later joined into a string
+                        let mut rel_import_path: Vec<String> = Vec::new();
+
+                        for part in parts {
+                            if let TokenType::Identifier { identifier } = part.token_type() {
+                                let part = identifier.to_string();
+                                if part == "script" {
+                                    rel_import_path.push(String::from("."));
+                                } else if part == "Parent" {
+                                    rel_import_path.push(String::from(".."));
+                                } else {
+                                    rel_import_path.push(part);
+                                }
+                            }
+                        }
+
+                        // Make sure that the current require has the first part as 'script'
+                        if rel_import_path[0] != "." {
+                            return node.clone();
+                        }
+
+                        let required_path = rel_import_path.join("/");
+                        self.cur_imports.push(required_path.clone());
+
+                        let mut punctuated = Punctuated::new();
+                        punctuated.push(Pair::new(
+                            ast::Expression::Value {
+                                value: Box::new(ast::Value::String(TokenReference::new(
+                                    Vec::new(),
+                                    Token::new(TokenType::StringLiteral {
+                                        literal: required_path.into(),
+                                        multi_line: None,
+                                        quote_type: StringLiteralQuoteType::Double,
+                                    }),
+                                    Vec::new(),
+                                ))),
+                                type_assertion: None,
+                            },
+                            None,
+                        ));
+
+                        return node
+                            .clone()
+                            .with_prefix(ast::Prefix::Name(TokenReference::new(
+                                Vec::new(),
+                                Token::new(TokenType::Identifier {
+                                    identifier: "_require".into(),
+                                }),
+                                Vec::new(),
+                            )))
+                            .with_suffixes(vec![Suffix::Call(ast::Call::AnonymousCall(
+                                ast::FunctionArgs::Parentheses {
+                                    parentheses: ContainedSpan::new(
+                                        TokenReference::new(
+                                            Vec::new(),
+                                            Token::new(TokenType::Identifier {
+                                                identifier: "(".into(),
+                                            }),
+                                            Vec::new(),
+                                        ),
+                                        TokenReference::new(
+                                            Vec::new(),
+                                            Token::new(TokenType::Identifier {
+                                                identifier: ")\n".into(),
+                                            }),
+                                            Vec::new(),
+                                        ),
+                                    ),
+                                    arguments: punctuated,
+                                },
+                            ))]);
+
+                        // TODO: the token into a _require
+                    }
+                    _ => (),
+                };
             }
         }
 
