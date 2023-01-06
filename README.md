@@ -17,6 +17,14 @@ Each file is structured as modules. You can use
 relative and absolute paths to import
 modules.
 
+## Features
+- JSON and Lua module imports
+- Supports relative and absolute paths
+- Supports 'require(script.Parent. [...])' syntax
+- Can use luau types, will be removed on compilation
+
+Used nicely with Roblox LSP
+
 ## Example
 
 file: `main.lua`

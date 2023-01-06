@@ -477,14 +477,25 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
                         let mut rel_import_path: Vec<String> = Vec::new();
 
                         for part in parts {
-                            if let TokenType::Identifier { identifier } = part.token_type() {
-                                let part = identifier.to_string();
-                                if part == "script" {
+                            let part_str = match part.token_type() {
+                                TokenType::Identifier { identifier } => {
+                                    Some(identifier.to_string())
+                                }
+                                TokenType::StringLiteral {
+                                    literal,
+                                    multi_line: _,
+                                    quote_type: _,
+                                } => Some(literal.to_string()),
+                                _ => None,
+                            };
+
+                            if let Some(part_str) = part_str {
+                                if part_str == "script" {
                                     rel_import_path.push(String::from("."));
-                                } else if part == "Parent" {
+                                } else if part_str == "Parent" {
                                     rel_import_path.push(String::from(".."));
                                 } else {
-                                    rel_import_path.push(part);
+                                    rel_import_path.push(part_str);
                                 }
                             }
                         }
