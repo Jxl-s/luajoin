@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::parser::RequireVisitor;
 use colorize::AnsiColor;
 use full_moon::visitors::VisitorMut;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{RecursiveMode};
 use notify_debouncer_mini::new_debouncer;
 use serde::{Deserialize, Serialize};
 use simple_websockets::{Event, Message, Responder};
@@ -13,7 +13,7 @@ use std::{
     collections::HashMap,
     env, fs, io,
     path::Path,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{SystemTime},
 };
 
 use crate::console;
@@ -312,7 +312,7 @@ pub fn run_bundler(config: Config) {
 pub fn build_project(config: Config) {
     let mut require_visitor = RequireVisitor::new(&config.src_dir, &config.entry_file);
 
-    let (bundle_result, source_maps, imports) = match require_visitor.generate_bundle(true) {
+    let (bundle_result, _, _) = match require_visitor.generate_bundle(true) {
         Ok(bundle) => bundle,
         Err(err) => {
             console::log_error(&format!("Problem generating bundle: {}", err));

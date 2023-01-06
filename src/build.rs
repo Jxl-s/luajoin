@@ -1,11 +1,4 @@
-use std::{clone, collections::HashMap};
-
 use full_moon::{
-    ast::{
-        punctuated::{Pair, Punctuated},
-        types::TypeAssertion,
-        Expression, Return, Value,
-    },
     tokenizer::{Token, TokenReference, TokenType},
     visitors::VisitorMut,
 };

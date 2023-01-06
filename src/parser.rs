@@ -5,11 +5,11 @@ use std::{fmt, fs};
 
 use full_moon::ast::punctuated::{Pair, Punctuated};
 use full_moon::ast::span::ContainedSpan;
-use full_moon::ast::types::{IfExpression, TypeDeclaration};
-use full_moon::ast::{self, Expression, Field, Suffix, TableConstructor, Var, VarExpression};
+use full_moon::ast::types::TypeDeclaration;
+use full_moon::ast::{self, Expression, Field, Suffix, TableConstructor, Var};
 use full_moon::node::Node;
 use full_moon::tokenizer::{StringLiteralQuoteType, Symbol, Token, TokenReference, TokenType};
-use full_moon::visitors::{Visitor, VisitorMut};
+use full_moon::visitors::VisitorMut;
 
 use crate::path::parse_path;
 
