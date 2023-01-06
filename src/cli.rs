@@ -251,7 +251,7 @@ pub fn run_bundler(config: Config) {
     // Create the bundler
     let (tx, rx) = std::sync::mpsc::channel();
 
-    let mut debouncer = new_debouncer(Duration::from_millis(500), None, tx).unwrap();
+    let mut debouncer = new_debouncer(Duration::from_millis(100), None, tx).unwrap();
 
     debouncer
         .watcher()

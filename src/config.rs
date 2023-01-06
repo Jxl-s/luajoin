@@ -3,7 +3,8 @@ use std::error::Error;
 use std::fs::{self, File};
 
 // Constants
-const CONFIG_FILE_NAME: &str = "config.luajoin.json";
+const CONFIG_FILE_NAME: &str = ".luajoin.json";
+const PROJ_FILE_NAME: &str = ".project.json";
 
 // Files
 const DEV_FILE_CONTENT: &str = include_str!("lua/.dev.lua");
@@ -46,6 +47,7 @@ pub fn create_config_file(src_dir: &str, out_dir: &str, entry: &str) -> Result<(
     fs::write(entry_path, MAIN_FILE_CONTENT)?;
     fs::write(dev_path, DEV_FILE_CONTENT)?;
     fs::write(".gitignore", &gitignore_content)?;
+    fs::write(PROJ_FILE_NAME, format!("{{\"tree\":{{\"$path\":\"src\"}}}}"))?;
 
     Ok(())
 }

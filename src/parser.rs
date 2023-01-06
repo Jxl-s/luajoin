@@ -470,13 +470,14 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
                             self.cur_imports.push(required_path.clone());
                         }
                     }
+                    // Here, it's going to be a require call with a 'script' inside
                     ast::Value::Var(Var::Expression(ve)) => {
                         let parts = ve.tokens().into_iter();
 
                         // Will store the state for the relative import, later joined into a string
                         let mut rel_import_path: Vec<String> = Vec::new();
 
-                        for part in parts {
+                        for (i, part) in parts.enumerate() {
                             let part_str = match part.token_type() {
                                 TokenType::Identifier { identifier } => {
                                     Some(identifier.to_string())
@@ -490,12 +491,21 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
                             };
 
                             if let Some(part_str) = part_str {
-                                if part_str == "script" {
-                                    rel_import_path.push(String::from("."));
-                                } else if part_str == "Parent" {
-                                    rel_import_path.push(String::from(".."));
-                                } else {
-                                    rel_import_path.push(part_str);
+                                // Make sure the first part is 'script'
+                                if i == 0 && part_str != "script" {
+                                    return node.clone();
+                                }
+
+                                match part_str.as_str() {
+                                    "script" => {
+                                        rel_import_path.push(String::from("."));
+                                    }
+                                    "Parent" => {
+                                        rel_import_path.push(String::from(".."));
+                                    }
+                                    _ => {
+                                        rel_import_path.push(part_str);
+                                    }
                                 }
                             }
                         }
@@ -505,9 +515,11 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
                             return node.clone();
                         }
 
+                        // Get the new path
                         let required_path = rel_import_path.join("/");
                         self.cur_imports.push(required_path.clone());
 
+                        // Create the tree nodes
                         let mut punctuated = Punctuated::new();
                         punctuated.push(Pair::new(
                             ast::Expression::Value {
