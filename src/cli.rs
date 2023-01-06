@@ -3,18 +3,13 @@ use crate::config::Config;
 use crate::parser::RequireVisitor;
 use colorize::AnsiColor;
 use full_moon::visitors::VisitorMut;
-use notify::{RecursiveMode};
+use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use serde::{Deserialize, Serialize};
 use simple_websockets::{Event, Message, Responder};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use std::{
-    collections::HashMap,
-    env, fs, io,
-    path::Path,
-    time::{SystemTime},
-};
+use std::time::{Duration, Instant};
+use std::{collections::HashMap, env, fs, io, path::Path, time::SystemTime};
 
 use crate::console;
 
@@ -312,6 +307,10 @@ pub fn run_bundler(config: Config) {
 pub fn build_project(config: Config) {
     let mut require_visitor = RequireVisitor::new(&config.src_dir, &config.entry_file);
 
+    // Display some info
+    let start_time = Instant::now();
+    console::log("Bundling project...");
+
     let (bundle_result, _, _) = match require_visitor.generate_bundle(true) {
         Ok(bundle) => bundle,
         Err(err) => {
@@ -320,15 +319,24 @@ pub fn build_project(config: Config) {
         }
     };
 
+    console::log(&"Bundle complete, performing optimizations ...".green());
+
     // Create an AST from the bundled result
     let ast = full_moon::parse(&bundle_result).unwrap();
     let built_ast = BuildVisitor {}.visit_ast(ast);
     let built_result = full_moon::print(&built_ast);
 
     // Write to the file
+    let output_path = &(config.out_dir.to_owned() + "/bundle.build.lua");
     fs::write(
         &(config.out_dir.to_owned() + "/bundle.build.lua"),
         &built_result,
     )
     .unwrap();
+
+    console::log(&format!(
+        "Project compiled in {}ms! Bundle is located at '{}'",
+        start_time.elapsed().as_millis(),
+        output_path.to_string().magenta()
+    ));
 }
