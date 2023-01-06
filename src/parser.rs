@@ -435,7 +435,7 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
 
         // Get the arguments
         if let ast::Suffix::Call(ast::Call::AnonymousCall(ast::FunctionArgs::Parentheses {
-            parentheses: _,
+            parentheses,
             arguments,
         })) = node.suffixes().next().unwrap()
         {
@@ -514,10 +514,17 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
                             None,
                         ));
 
-                        fs::write("what.json", serde_json::to_string_pretty(&node).unwrap())
-                            .unwrap();
-
-                        let ends_with_newline = node.to_string().ends_with("\n");
+                        let ends_with_newline =
+                            match parentheses.tokens().1.trailing_trivia().last() {
+                                Some(t) => {
+                                    if let TokenType::Whitespace { characters } = t.token_type() {
+                                        characters.to_string().contains("\n")
+                                    } else {
+                                        false
+                                    }
+                                }
+                                _ => false,
+                            };
 
                         return node
                             .clone()
