@@ -8,7 +8,6 @@ use full_moon::ast::span::ContainedSpan;
 use full_moon::ast::types::{IfExpression, TypeDeclaration};
 use full_moon::ast::{self, Expression, Field, Suffix, TableConstructor, Var, VarExpression};
 use full_moon::node::Node;
-use full_moon::print;
 use full_moon::tokenizer::{StringLiteralQuoteType, Symbol, Token, TokenReference, TokenType};
 use full_moon::visitors::{Visitor, VisitorMut};
 
@@ -515,6 +514,11 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
                             None,
                         ));
 
+                        fs::write("what.json", serde_json::to_string_pretty(&node).unwrap())
+                            .unwrap();
+
+                        let ends_with_newline = node.to_string().ends_with("\n");
+
                         return node
                             .clone()
                             .with_prefix(ast::Prefix::Name(TokenReference::new(
@@ -537,9 +541,17 @@ impl<'a> VisitorMut for RequireVisitor<'a> {
                                         TokenReference::new(
                                             Vec::new(),
                                             Token::new(TokenType::Identifier {
-                                                identifier: ")\n".into(),
+                                                identifier: ")".into(),
                                             }),
-                                            Vec::new(),
+                                            if ends_with_newline {
+                                                vec![
+                                                    (Token::new(TokenType::Whitespace {
+                                                        characters: "\n".into(),
+                                                    })),
+                                                ]
+                                            } else {
+                                                Vec::new()
+                                            },
                                         ),
                                     ),
                                     arguments: punctuated,
