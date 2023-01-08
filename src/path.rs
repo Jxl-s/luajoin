@@ -30,3 +30,32 @@ pub fn parse_path(cur_path: &str, next_path: &str) -> String {
 
     return new_path.join("/");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relative_path() {
+        let cur_path = "main_dir/file";
+        let next_path = "./hello";
+
+        assert_eq!(parse_path(cur_path, next_path), "main_dir/hello");
+    }
+
+    #[test]
+    fn absolute_path() {
+        let cur_path = "main_dir";
+        let next_path = "module";
+
+        assert_eq!(parse_path(cur_path, next_path), "module");
+    }
+
+    #[test]
+    fn two_dots_path() {
+        let cur_path = "dir/subdir/file";
+        let next_path = "../other";
+
+        assert_eq!(parse_path(cur_path, next_path), "dir/other");
+    }
+}
