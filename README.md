@@ -1,8 +1,7 @@
 # luajoin
 
-I created this as a way to familiarize myself with
-rust. It's a simple program that allows one to join
-multiple lua files together into a single bundle.
+A program (now abandoned) that allows multiple lua files to be joined together into a single bundle.
+Previously used to learn more on Rust, and to develop single-file scripts, I am but no longer doing that anymore, so I am making this repository public.
 
 JSON files are also supported.
 
